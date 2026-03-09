@@ -54,17 +54,31 @@
             <button id="reset-btn" class="btn-secondary">← Upload New File</button>
           </div>
 
-          <!-- Stats Cards -->
-          <div id="stats-cards" class="stats-grid"></div>
+          <div class="filter-bar chart-card">
+            <div class="filter-actions">
+              <button id="clear-date-filters" class="btn-secondary" type="button">Clear all dates</button>
+            </div>
+            <div class="filter-row">
+              <span class="filter-label">Year</span>
+              <div id="year-filters" class="filter-group"></div>
+            </div>
+            <div class="filter-row">
+              <span class="filter-label">Month</span>
+              <div id="month-filters" class="filter-group"></div>
+            </div>
+          </div>
 
-          <!-- Sankey Chart -->
-          <div class="chart-card">
+          <!-- Sankey Chart (Primary) -->
+          <div class="chart-card sankey-main-card">
             <h3>Match Progression Flow</h3>
             <p class="chart-desc">
-              How your matches moved from initial connection through conversation to outcome
+              Main view of how your matches moved from connection to outcomes
             </p>
             <div id="sankey-chart"></div>
           </div>
+
+          <!-- Stats Cards -->
+          <div id="stats-cards" class="stats-grid"></div>
 
           <!-- Monthly Timeline & Day of Week -->
           <div class="charts-grid">

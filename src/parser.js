@@ -31,7 +31,34 @@ export function parseMatches(data) {
   let neverChatted = 0;
   let weMet = 0;
   let unmatched = 0;
-  let ongoing = 0;
+  let theyUnmatchedMe = 0;
+  let ignored = 0;
+  let ignoredByMe = 0;
+  let rejected = 0;
+  let sentMessages = 0;
+  let receivedMessages = 0;
+  let likesSent = 0;
+  let likesReceived = 0;
+  let sentLikesWithOpener = 0;
+  let likesSentWithComment = 0;
+  let likesSentBlank = 0;
+  let likesReceivedWithComment = 0;
+  let likesReceivedBlank = 0;
+  let likesSentMatched = 0;
+  let likesSentIgnored = 0;
+  let likesReceivedMatched = 0;
+  let likesReceivedIgnored = 0;
+  let likesSentWithCommentMatched = 0;
+  let likesSentWithCommentIgnored = 0;
+  let likesSentBlankMatched = 0;
+  let likesSentBlankIgnored = 0;
+  let likesReceivedWithCommentMatched = 0;
+  let likesReceivedWithCommentIgnored = 0;
+  let likesReceivedBlankMatched = 0;
+  let likesReceivedBlankIgnored = 0;
+  let matchedTotal = 0;
+  let matchedChatted = 0;
+  let matchedNoChat = 0;
 
   /** @type {Record<string, number>} YYYY-MM → count */
   const monthlyMatches = {};
@@ -52,16 +79,73 @@ export function parseMatches(data) {
   const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   for (const match of data) {
-    // Timestamp comes from "match" or "like" array (both appear in the wild)
     const initEvent = (match.match || match.like || [])[0];
-    if (initEvent?.timestamp) {
-      const date = parseHingeDate(initEvent.timestamp);
-      if (date) {
-        const monthKey =
-          `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        monthlyMatches[monthKey] = (monthlyMatches[monthKey] || 0) + 1;
-        dayOfWeekCounts[DAY_NAMES[date.getDay()]]++;
-        hourlyCounts[date.getHours()]++;
+    const anchorDate = getMatchAnchorDate(match);
+    if (anchorDate) {
+      const monthKey =
+        `${anchorDate.getFullYear()}-${String(anchorDate.getMonth() + 1).padStart(2, '0')}`;
+      monthlyMatches[monthKey] = (monthlyMatches[monthKey] || 0) + 1;
+      dayOfWeekCounts[DAY_NAMES[anchorDate.getDay()]]++;
+      hourlyCounts[anchorDate.getHours()]++;
+    }
+
+    const hasLike = Array.isArray(match.like) && match.like.length > 0;
+    const hasMatch = Array.isArray(match.match) && match.match.length > 0;
+    const isLikeOnly = hasLike && !hasMatch;
+    const likeComment = getLikeComment(match);
+    const receivedLikeComment = getReceivedLikeComment(match);
+    const sentHasComment = hasCommentText(likeComment);
+    const receivedHasComment = hasCommentText(receivedLikeComment);
+
+    if (hasLike) {
+      likesSent++;
+      if (sentHasComment) {
+        likesSentWithComment++;
+      } else {
+        likesSentBlank++;
+      }
+
+      if (hasOpener(likeComment)) {
+        sentLikesWithOpener++;
+      }
+
+      if (hasMatch) {
+        likesSentMatched++;
+        if (sentHasComment) {
+          likesSentWithCommentMatched++;
+        } else {
+          likesSentBlankMatched++;
+        }
+      } else {
+        likesSentIgnored++;
+        if (sentHasComment) {
+          likesSentWithCommentIgnored++;
+        } else {
+          likesSentBlankIgnored++;
+        }
+      }
+    } else {
+      likesReceived++;
+      if (receivedHasComment) {
+        likesReceivedWithComment++;
+      } else {
+        likesReceivedBlank++;
+      }
+
+      if (hasMatch) {
+        likesReceivedMatched++;
+        if (receivedHasComment) {
+          likesReceivedWithCommentMatched++;
+        } else {
+          likesReceivedBlankMatched++;
+        }
+      } else {
+        likesReceivedIgnored++;
+        if (receivedHasComment) {
+          likesReceivedWithCommentIgnored++;
+        } else {
+          likesReceivedBlankIgnored++;
+        }
       }
     }
 
@@ -69,24 +153,54 @@ export function parseMatches(data) {
     const msgCount = chats.length;
     totalMessages += msgCount;
 
+    for (let i = 0; i < chats.length; i++) {
+      const direction = getMessageDirection(chats[i], i);
+      if (direction === 'sent') {
+        sentMessages++;
+      } else {
+        receivedMessages++;
+      }
+    }
+
     const hasChatted = msgCount > 0;
     const hasWeMet = (match.we_met || []).length > 0;
     const hasBlock = (match.block || []).length > 0;
+
+    if (hasMatch) {
+      matchedTotal++;
+      if (hasChatted) {
+        matchedChatted++;
+      } else {
+        matchedNoChat++;
+      }
+    }
 
     if (hasChatted) {
       chatted++;
       conversationLengths.push(msgCount);
     } else {
-      neverChatted++;
+      if (isLikeOnly) {
+        if (startsWithRemove(likeComment)) {
+          ignoredByMe++;
+        } else {
+          ignored++;
+        }
+      } else {
+        neverChatted++;
+      }
     }
 
     // Determine outcome (we_met takes priority, then block, then ongoing)
+    if (hasBlock) {
+      rejected++;
+    }
+
     if (hasWeMet) {
       weMet++;
     } else if (hasBlock && hasChatted) {
       unmatched++;
     } else if (hasChatted) {
-      ongoing++;
+      theyUnmatchedMe++;
     }
   }
 
@@ -96,7 +210,34 @@ export function parseMatches(data) {
     neverChatted,
     weMet,
     unmatched,
-    ongoing,
+    theyUnmatchedMe,
+    ignored,
+    ignoredByMe,
+    rejected,
+    sentMessages,
+    receivedMessages,
+    likesSent,
+    likesReceived,
+    sentLikesWithOpener,
+    likesSentWithComment,
+    likesSentBlank,
+    likesReceivedWithComment,
+    likesReceivedBlank,
+    likesSentMatched,
+    likesSentIgnored,
+    likesReceivedMatched,
+    likesReceivedIgnored,
+    likesSentWithCommentMatched,
+    likesSentWithCommentIgnored,
+    likesSentBlankMatched,
+    likesSentBlankIgnored,
+    likesReceivedWithCommentMatched,
+    likesReceivedWithCommentIgnored,
+    likesReceivedBlankMatched,
+    likesReceivedBlankIgnored,
+    matchedTotal,
+    matchedChatted,
+    matchedNoChat,
     monthlyMatches,
     dayOfWeekCounts,
     hourlyCounts,
@@ -114,13 +255,135 @@ export function parseMatches(data) {
 }
 
 /**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function startsWithRemove(value) {
+  return typeof value === 'string' && value.trim().toLowerCase().startsWith('remove');
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasOpener(value) {
+  return typeof value === 'string' && value.trim().length > 0 && !startsWithRemove(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function hasCommentText(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Extract comment text from Hinge like payload.
+ * Some exports store it at like[0].like[0].comment.
+ *
+ * @param {Record<string, unknown>} match
+ * @returns {string}
+ */
+function getLikeComment(match) {
+  const outerLike = Array.isArray(match.like) ? match.like[0] : null;
+  if (!outerLike || typeof outerLike !== 'object') return '';
+
+  if (typeof outerLike.comment === 'string') {
+    return outerLike.comment;
+  }
+
+  const nestedLike = Array.isArray(outerLike.like) ? outerLike.like[0] : null;
+  if (nestedLike && typeof nestedLike === 'object' && typeof nestedLike.comment === 'string') {
+    return nestedLike.comment;
+  }
+
+  return '';
+}
+
+/**
+ * Extract comment text from received-like payload when present.
+ *
+ * @param {Record<string, unknown>} match
+ * @returns {string}
+ */
+function getReceivedLikeComment(match) {
+  const matchEntry = Array.isArray(match.match) ? match.match[0] : null;
+  if (!matchEntry || typeof matchEntry !== 'object') return '';
+
+  if (typeof matchEntry.comment === 'string') {
+    return matchEntry.comment;
+  }
+
+  const nestedMatch = Array.isArray(matchEntry.match) ? matchEntry.match[0] : null;
+  if (nestedMatch && typeof nestedMatch === 'object' && typeof nestedMatch.comment === 'string') {
+    return nestedMatch.comment;
+  }
+
+  return '';
+}
+
+/**
+ * Best-effort detection for who initiated the like.
+ *
+ * @param {Record<string, unknown> | undefined} initEvent
+ * @param {Record<string, unknown>} match
+ * @returns {'sent' | 'received' | 'unknown'}
+ */
+function getLikeDirection(initEvent, match) {
+  const event = initEvent && typeof initEvent === 'object' ? initEvent : {};
+
+  const booleanKeys = ['is_sender', 'is_me', 'from_me', 'sent_by_me'];
+  for (const key of booleanKeys) {
+    if (typeof event[key] === 'boolean') {
+      return event[key] ? 'sent' : 'received';
+    }
+  }
+
+  const stringKeys = ['sender', 'from', 'author', 'participant', 'direction', 'like_type'];
+  for (const key of stringKeys) {
+    if (typeof event[key] === 'string') {
+      const value = event[key].toLowerCase();
+      if (
+        value.includes('sent') ||
+        value.includes('outbound') ||
+        value.includes('me') ||
+        value.includes('self') ||
+        value.includes('you')
+      ) {
+        return 'sent';
+      }
+      if (
+        value.includes('received') ||
+        value.includes('inbound') ||
+        value.includes('them') ||
+        value.includes('other') ||
+        value.includes('match')
+      ) {
+        return 'received';
+      }
+    }
+  }
+
+  if (startsWithRemove(event.comment)) {
+    return 'received';
+  }
+
+  if (Array.isArray(match.like) && match.like.length > 0 && !(Array.isArray(match.match) && match.match.length > 0)) {
+    return 'sent';
+  }
+
+  return 'unknown';
+}
+
+/**
  * Parse Hinge's timestamp format "2021-03-15 14:23:11.000000+00:00"
  * as well as standard ISO 8601 strings.
  *
  * @param {string} timestamp
  * @returns {Date|null}
  */
-function parseHingeDate(timestamp) {
+export function parseHingeDate(timestamp) {
   if (!timestamp) return null;
   try {
     // Replace the space separator with T so Date.parse handles it correctly
@@ -130,6 +393,75 @@ function parseHingeDate(timestamp) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Returns the best available date for a record so filters/charts include
+ * records that only have remove/block events.
+ *
+ * @param {Record<string, unknown>} match
+ * @returns {Date|null}
+ */
+export function getMatchAnchorDate(match) {
+  const timestamp =
+    getTimestampFromArray(match.match) ||
+    getTimestampFromArray(match.like) ||
+    getTimestampFromArray(match.block) ||
+    getTimestampFromArray(match.chats);
+
+  return parseHingeDate(timestamp);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function getTimestampFromArray(value) {
+  if (!Array.isArray(value) || value.length === 0) return '';
+  const first = value[0];
+  if (!first || typeof first !== 'object') return '';
+  return typeof first.timestamp === 'string' ? first.timestamp : '';
+}
+
+/**
+ * Best-effort message direction detection from Hinge export fields.
+ * Falls back to alternating direction when not explicitly present.
+ *
+ * @param {Record<string, unknown>} chat
+ * @param {number} index
+ * @returns {'sent' | 'received'}
+ */
+function getMessageDirection(chat, index) {
+  if (!chat || typeof chat !== 'object') {
+    return index % 2 === 0 ? 'received' : 'sent';
+  }
+
+  const booleanKeys = ['is_sender', 'is_me', 'from_me', 'sent_by_me'];
+  for (const key of booleanKeys) {
+    if (typeof chat[key] === 'boolean') {
+      return chat[key] ? 'sent' : 'received';
+    }
+  }
+
+  const stringKeys = ['sender', 'from', 'author', 'participant'];
+  for (const key of stringKeys) {
+    if (typeof chat[key] === 'string') {
+      const value = chat[key].toLowerCase();
+      if (value.includes('me') || value.includes('self') || value.includes('you')) {
+        return 'sent';
+      }
+      if (
+        value.includes('them') ||
+        value.includes('match') ||
+        value.includes('other') ||
+        value.includes('partner')
+      ) {
+        return 'received';
+      }
+    }
+  }
+
+  return index % 2 === 0 ? 'received' : 'sent';
 }
 
 /**
@@ -192,7 +524,7 @@ export function generateSampleData() {
           },
         ];
       }
-      // remaining ~50 % → Ongoing
+      // remaining ~50 % → They unmatched me (in this app's interpretation)
     }
 
     matches.push(entry);
