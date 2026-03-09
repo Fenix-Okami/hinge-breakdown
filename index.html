@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hinge Breakdown — Analyze Your Matches</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="header-inner">
+          <h1>🔥 Hinge Breakdown</h1>
+          <p>Upload your matches.json and see exactly how your matches progressed</p>
+        </div>
+      </header>
+
+      <main>
+        <!-- Error banner -->
+        <div id="error-message" class="error-message hidden"></div>
+
+        <!-- ── Upload Section ── -->
+        <section id="upload-section">
+          <div class="privacy-notice">
+            🔒 Everything runs in your browser — your data never leaves your device
+          </div>
+
+          <div id="drop-zone" class="drop-zone">
+            <div class="drop-zone-content">
+              <div class="upload-icon">📊</div>
+              <h2>Upload your matches.json</h2>
+              <p>Drag &amp; drop your file here, or click to browse</p>
+              <p class="help-text">
+                Get your data: Hinge app → Settings → Download My Data
+              </p>
+              <button id="upload-btn" class="btn-primary">Choose File</button>
+              <input type="file" id="file-input" accept=".json,application/json" hidden />
+            </div>
+          </div>
+
+          <div class="demo-section">
+            <p>Don't have your data yet?</p>
+            <button id="demo-btn" class="btn-secondary">Try with sample data →</button>
+          </div>
+        </section>
+
+        <!-- ── Dashboard ── -->
+        <section id="dashboard" class="hidden">
+          <div class="dashboard-header">
+            <div class="dashboard-title">
+              <h2>Your Hinge Analysis</h2>
+              <span id="sample-notice" class="sample-badge hidden">Sample Data</span>
+            </div>
+            <button id="reset-btn" class="btn-secondary">← Upload New File</button>
+          </div>
+
+          <!-- Stats Cards -->
+          <div id="stats-cards" class="stats-grid"></div>
+
+          <!-- Sankey Chart -->
+          <div class="chart-card">
+            <h3>Match Progression Flow</h3>
+            <p class="chart-desc">
+              How your matches moved from initial connection through conversation to outcome
+            </p>
+            <div id="sankey-chart"></div>
+          </div>
+
+          <!-- Monthly Timeline & Day of Week -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Matches by Month</h3>
+              <canvas id="monthly-chart"></canvas>
+            </div>
+            <div class="chart-card">
+              <h3>Matches by Day of Week</h3>
+              <canvas id="dayofweek-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Conversation Length & Hourly Distribution -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <h3>Conversation Length Distribution</h3>
+              <p class="chart-desc">Number of messages exchanged per conversation</p>
+              <canvas id="convlength-chart"></canvas>
+            </div>
+            <div class="chart-card">
+              <h3>Matches by Hour of Day</h3>
+              <p class="chart-desc">When matches tend to occur (based on match timestamp)</p>
+              <canvas id="hourly-chart"></canvas>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <p>
+          Hinge Breakdown &middot; Open source &middot;
+          <a href="https://github.com/Fenix-Okami/hinge-breakdown" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
