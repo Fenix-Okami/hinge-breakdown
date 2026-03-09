@@ -9,7 +9,7 @@ const NODE_COLORS = {
   sentblank: '#1d4ed8', // Dark blue  – Sent blank
   receivedcomment: '#67e8f9', // Light cyan – Received with comment
   receivedblank: '#0891b2', // Dark cyan – Received blank
-  matched:   '#84cc16', // Lime       – Matched
+  matched:   '#7c3aed', // Burple     – Matched
   likeignored: '#ef4444', // Red      – Sent like ignored
   receivedignored: '#9ca3af', // Gray – Received like ignored by you / expired
   chatted:   '#3b82f6', // Blue       – Had a conversation

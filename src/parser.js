@@ -125,26 +125,29 @@ export function parseMatches(data) {
         }
       }
     } else {
-      likesReceived++;
-      if (receivedHasComment) {
-        likesReceivedWithComment++;
-      } else {
-        likesReceivedBlank++;
-      }
-
-      if (hasMatch) {
-        likesReceivedMatched++;
+      // Only count received likes if they matched OR if they came with a comment.
+      if (hasMatch || receivedHasComment) {
+        likesReceived++;
         if (receivedHasComment) {
-          likesReceivedWithCommentMatched++;
+          likesReceivedWithComment++;
         } else {
-          likesReceivedBlankMatched++;
+          likesReceivedBlank++;
         }
-      } else {
-        likesReceivedIgnored++;
-        if (receivedHasComment) {
-          likesReceivedWithCommentIgnored++;
+
+        if (hasMatch) {
+          likesReceivedMatched++;
+          if (receivedHasComment) {
+            likesReceivedWithCommentMatched++;
+          } else {
+            likesReceivedBlankMatched++;
+          }
         } else {
-          likesReceivedBlankIgnored++;
+          likesReceivedIgnored++;
+          if (receivedHasComment) {
+            likesReceivedWithCommentIgnored++;
+          } else {
+            likesReceivedBlankIgnored++;
+          }
         }
       }
     }

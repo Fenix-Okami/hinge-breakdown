@@ -1,8 +1,8 @@
 /* ── CSS Variables ── */
 :root {
-  --color-primary: #e8234a;
-  --color-primary-dark: #c41a3b;
-  --color-primary-light: #fff0f3;
+  --color-primary: #7c3aed;
+  --color-primary-dark: #6d28d9;
+  --color-primary-light: #f3e8ff;
   --color-bg: #f7f8fc;
   --color-card: #ffffff;
   --color-text: #1a1a2e;
@@ -38,7 +38,7 @@ body {
 
 /* ── Header ── */
 header {
-  background: linear-gradient(135deg, #e8234a 0%, #ff6b6b 100%);
+  background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%);
   color: white;
   padding: 2.5rem 2rem;
   text-align: center;
@@ -211,6 +211,75 @@ main {
   margin-bottom: 1.25rem;
 }
 
+.heatmap-card {
+  margin-bottom: 1.25rem;
+}
+
+.heatmap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.heatmap-toggle {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.calendar-heatmap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.heatmap-chunks {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  min-height: 120px;
+}
+
+.heatmap-chunk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.heatmap-chunk-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.heatmap-month-grid {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 0;
+  width: max-content;
+}
+
+.heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: #e5e7eb;
+  border: 1px solid #4b5563;
+}
+
+.heatmap-cell-outside {
+  background: transparent;
+}
+
+.heatmap-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  padding: 0.75rem 0.2rem;
+}
+
 .filter-actions {
   display: flex;
   justify-content: flex-end;
@@ -361,6 +430,15 @@ main {
   font-size: 0.85rem;
   color: var(--color-text-secondary);
   margin-bottom: 1rem;
+}
+
+.chart-card canvas {
+  width: 100% !important;
+  height: 320px !important;
+}
+
+#hourly-chart {
+  height: 430px !important;
 }
 
 .charts-grid {

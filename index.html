@@ -54,6 +54,17 @@
             <button id="reset-btn" class="btn-secondary">← Upload New File</button>
           </div>
 
+          <div class="chart-card heatmap-card">
+            <div class="heatmap-header">
+              <h3>Calendar Activity Heatmap</h3>
+              <div class="heatmap-toggle" role="group" aria-label="Heatmap metric">
+                <button id="heatmap-likes-btn" class="filter-btn active" type="button">Likes Sent</button>
+                <button id="heatmap-matches-btn" class="filter-btn" type="button">Matches Made</button>
+              </div>
+            </div>
+            <div id="calendar-heatmap" class="calendar-heatmap"></div>
+          </div>
+
           <div class="filter-bar chart-card">
             <div class="filter-actions">
               <button id="clear-date-filters" class="btn-secondary" type="button">Clear all dates</button>
@@ -77,17 +88,14 @@
             <div id="sankey-chart"></div>
           </div>
 
-          <!-- Stats Cards -->
-          <div id="stats-cards" class="stats-grid"></div>
-
           <!-- Monthly Timeline & Day of Week -->
           <div class="charts-grid">
             <div class="chart-card">
-              <h3>Matches by Month</h3>
+              <h3>Likes vs Matches by Month</h3>
               <canvas id="monthly-chart"></canvas>
             </div>
             <div class="chart-card">
-              <h3>Matches by Day of Week</h3>
+              <h3>Likes vs Matches by Day of Week</h3>
               <canvas id="dayofweek-chart"></canvas>
             </div>
           </div>
@@ -95,13 +103,13 @@
           <!-- Conversation Length & Hourly Distribution -->
           <div class="charts-grid">
             <div class="chart-card">
-              <h3>Conversation Length Distribution</h3>
-              <p class="chart-desc">Number of messages exchanged per conversation</p>
+              <h3>Likes vs Matches by Year</h3>
+              <p class="chart-desc">Stacked by likes sent and matches made</p>
               <canvas id="convlength-chart"></canvas>
             </div>
             <div class="chart-card">
-              <h3>Matches by Hour of Day</h3>
-              <p class="chart-desc">When matches tend to occur (based on match timestamp)</p>
+              <h3>Likes vs Matches by Hour of Day</h3>
+              <p class="chart-desc">Each metric uses its own timestamp source</p>
               <canvas id="hourly-chart"></canvas>
             </div>
           </div>

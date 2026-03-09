@@ -20,16 +20,19 @@ const uploadBtn     = document.getElementById('upload-btn');
 const dropZone      = document.getElementById('drop-zone');
 const demoBtn       = document.getElementById('demo-btn');
 const resetBtn      = document.getElementById('reset-btn');
-const statsCards    = document.getElementById('stats-cards');
 const sampleNotice  = document.getElementById('sample-notice');
 const errorMsg      = document.getElementById('error-message');
 const yearFilters   = document.getElementById('year-filters');
 const monthFilters  = document.getElementById('month-filters');
 const clearDateFiltersBtn = document.getElementById('clear-date-filters');
+const calendarHeatmap = document.getElementById('calendar-heatmap');
+const heatmapLikesBtn = document.getElementById('heatmap-likes-btn');
+const heatmapMatchesBtn = document.getElementById('heatmap-matches-btn');
 
 let sourceData = null;
 let selectedYears = new Set();
 let selectedMonths = new Set();
+let heatmapMetric = 'likes';
 
 const MONTHS = [
   { key: 1, label: 'Jan' },
@@ -53,6 +56,20 @@ demoBtn.addEventListener('click', loadSampleData);
 resetBtn.addEventListener('click', resetDashboard);
 if (clearDateFiltersBtn) {
   clearDateFiltersBtn.addEventListener('click', clearDateFilters);
+}
+if (heatmapLikesBtn) {
+  heatmapLikesBtn.addEventListener('click', () => {
+    heatmapMetric = 'likes';
+    refreshHeatmapMetricButtons();
+    renderFilteredDashboard();
+  });
+}
+if (heatmapMatchesBtn) {
+  heatmapMatchesBtn.addEventListener('click', () => {
+    heatmapMetric = 'matches';
+    refreshHeatmapMetricButtons();
+    renderFilteredDashboard();
+  });
 }
 
 // Drag and drop
@@ -144,8 +161,9 @@ function renderFilteredDashboard() {
   if (!sourceData) return;
 
   let stats;
+  let filteredData = [];
   try {
-    const filteredData = filterMatches(sourceData, selectedYears, selectedMonths);
+    filteredData = filterMatches(sourceData, selectedYears, selectedMonths);
     stats = filteredData.length > 0 ? parseMatches(filteredData) : createEmptyStats();
   } catch (err) {
     showError(/** @type {Error} */ (err).message);
@@ -153,165 +171,112 @@ function renderFilteredDashboard() {
   }
 
   hideError();
-  renderStatsCards(stats);
+  renderCalendarHeatmap(filteredData, heatmapMetric);
+
+  const activitySeries = buildActivitySeries(filteredData);
 
   const sankeyContainer = document.getElementById('sankey-chart');
   renderSankey(sankeyContainer, stats);
 
-  renderMonthlyChart('monthly-chart', stats.monthlyMatches);
-  renderDayOfWeekChart('dayofweek-chart', stats.dayOfWeekCounts);
-  renderConvLengthChart('convlength-chart', stats.conversationLengths);
-  renderHourlyChart('hourly-chart', stats.hourlyCounts);
+  renderMonthlyChart('monthly-chart', activitySeries.monthly.likes, activitySeries.monthly.matches);
+  renderDayOfWeekChart('dayofweek-chart', activitySeries.dayOfWeek.likes, activitySeries.dayOfWeek.matches);
+  renderConvLengthChart('convlength-chart', activitySeries.yearly.likes, activitySeries.yearly.matches);
+  renderHourlyChart('hourly-chart', activitySeries.hourly.likes, activitySeries.hourly.matches);
 }
 
-// ── Stats cards ───────────────────────────────────────────────────────────────
+// ── Calendar heatmap ─────────────────────────────────────────────────────────
 
-function renderStatsCards(stats) {
-  const {
-    total,
-    chatted,
-    neverChatted,
-    weMet,
-    unmatched,
-    theyUnmatchedMe,
-    ignored,
-    ignoredByMe,
-    rejected,
-    sentMessages,
-    receivedMessages,
-    likesSent,
-    likesReceived,
-    sentLikesWithOpener,
-    likesSentWithComment,
-    likesSentBlank,
-    likesReceivedWithComment,
-    likesReceivedBlank,
-    avgMessages, maxMessages,
-  } = stats;
+function renderCalendarHeatmap(data, metric) {
+  if (!calendarHeatmap) return;
 
-  const pct = (n, d) =>
-    d > 0 ? `${Math.round((n / d) * 100)}%` : '—';
+  calendarHeatmap.innerHTML = '';
+  if (!Array.isArray(data) || data.length === 0) {
+    calendarHeatmap.innerHTML = '<p class="heatmap-empty">No activity in current filter.</p>';
+    return;
+  }
 
-  statsCards.innerHTML = `
-    <div class="stat-card">
-      <div class="stat-number">${total}</div>
-      <div class="stat-label">Total Matches</div>
-    </div>
+  const dateCounts = new Map();
 
-    <div class="stat-card blue">
-      <div class="stat-number">${chatted}</div>
-      <div class="stat-label">Conversations</div>
-      <div class="stat-pct">${pct(chatted, total)} of matches</div>
-    </div>
+  for (const item of data) {
+    const timestamp = getMetricTimestamp(item, metric);
+    const date = parseHingeDate(timestamp);
+    if (!date) continue;
+    if (!isDateSelected(date)) continue;
+    const key = toDateKey(date);
+    dateCounts.set(key, (dateCounts.get(key) || 0) + 1);
+  }
 
-    <div class="stat-card red">
-      <div class="stat-number">${rejected}</div>
-      <div class="stat-label">Rejected</div>
-      <div class="stat-pct">matches removed</div>
-    </div>
+  if (dateCounts.size === 0) {
+    calendarHeatmap.innerHTML = '<p class="heatmap-empty">No activity in current filter.</p>';
+    return;
+  }
+  const maxValue = Math.max(...dateCounts.values(), 1);
 
-    <div class="stat-card blue">
-      <div class="stat-number">${sentMessages}</div>
-      <div class="stat-label">Messages Sent</div>
-      <div class="stat-pct">total</div>
-    </div>
+  const monthKeys = Array.from(
+    new Set(Array.from(dateCounts.keys()).map(key => key.slice(0, 7)))
+  ).sort((a, b) => b.localeCompare(a));
 
-    <div class="stat-card blue">
-      <div class="stat-number">${likesSent}</div>
-      <div class="stat-label">Likes Sent</div>
-      <div class="stat-pct">initial likes from you</div>
-    </div>
+  const chunks = document.createElement('div');
+  chunks.className = 'heatmap-chunks';
 
-    <div class="stat-card green">
-      <div class="stat-number">${likesReceived}</div>
-      <div class="stat-label">Likes Received</div>
-      <div class="stat-pct">initial likes to you</div>
-    </div>
+  for (const monthKey of monthKeys) {
+    const [yearStr, monthStr] = monthKey.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const firstOfMonth = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0).getDate();
+    const offset = firstOfMonth.getDay();
+    const totalCells = offset + lastDay;
+    const totalWeeks = Math.ceil(totalCells / 7);
 
-    <div class="stat-card amber">
-      <div class="stat-number">${sentLikesWithOpener}</div>
-      <div class="stat-label">Sent with Opener</div>
-      <div class="stat-pct">likes with a message</div>
-    </div>
+    const chunk = document.createElement('div');
+    chunk.className = 'heatmap-chunk';
 
-    <div class="stat-card blue">
-      <div class="stat-number">${likesSentWithComment}</div>
-      <div class="stat-label">Sent: Comment</div>
-      <div class="stat-pct">likes with comment</div>
-    </div>
+    const label = document.createElement('div');
+    label.className = 'heatmap-chunk-label';
+    label.textContent = firstOfMonth.toLocaleString('default', {
+      month: 'short',
+      year: 'numeric',
+    });
+    chunk.appendChild(label);
 
-    <div class="stat-card blue">
-      <div class="stat-number">${likesSentBlank}</div>
-      <div class="stat-label">Sent: Blank</div>
-      <div class="stat-pct">likes without comment</div>
-    </div>
+    const grid = document.createElement('div');
+    grid.className = 'heatmap-month-grid';
+    grid.style.gridTemplateRows = 'repeat(7, 12px)';
+    grid.style.gridTemplateColumns = `repeat(${totalWeeks}, 12px)`;
 
-    <div class="stat-card green">
-      <div class="stat-number">${likesReceivedWithComment}</div>
-      <div class="stat-label">Received: Comment</div>
-      <div class="stat-pct">likes with comment</div>
-    </div>
+    for (let cellIndex = 0; cellIndex < totalWeeks * 7; cellIndex++) {
+      const weekIndex = Math.floor(cellIndex / 7);
+      const dayOfWeek = cellIndex % 7;
+      const reversedWeekIndex = totalWeeks - 1 - weekIndex;
+      const day = cellIndex - offset + 1;
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+      cell.style.gridColumn = String(reversedWeekIndex + 1);
+      cell.style.gridRow = String(dayOfWeek + 1);
 
-    <div class="stat-card green">
-      <div class="stat-number">${likesReceivedBlank}</div>
-      <div class="stat-label">Received: Blank</div>
-      <div class="stat-pct">likes without comment</div>
-    </div>
+      if (day < 1 || day > lastDay) {
+        cell.classList.add('heatmap-cell-outside');
+        grid.appendChild(cell);
+        continue;
+      }
 
-    <div class="stat-card green">
-      <div class="stat-number">${receivedMessages}</div>
-      <div class="stat-label">Messages Received</div>
-      <div class="stat-pct">total</div>
-    </div>
+      const key = `${monthKey}-${String(day).padStart(2, '0')}`;
+      const value = dateCounts.get(key) || 0;
+      if (value > 0) {
+        cell.style.background = metric === 'likes'
+          ? `rgba(59,130,246,${0.18 + 0.82 * (value / maxValue)})`
+          : `rgba(124,58,237,${0.18 + 0.82 * (value / maxValue)})`;
+      }
+      cell.title = `${key}: ${value} ${metric === 'likes' ? 'likes sent' : 'matches made'}`;
+      grid.appendChild(cell);
+    }
 
-    <div class="stat-card gray">
-      <div class="stat-number">${ignored}</div>
-      <div class="stat-label">Ignored</div>
-      <div class="stat-pct">you sent like, no reply</div>
-    </div>
+    chunk.appendChild(grid);
+    chunks.appendChild(chunk);
+  }
 
-    <div class="stat-card amber">
-      <div class="stat-number">${ignoredByMe}</div>
-      <div class="stat-label">Ignored by You</div>
-      <div class="stat-pct">started with remove</div>
-    </div>
-
-    <div class="stat-card gray">
-      <div class="stat-number">${neverChatted}</div>
-      <div class="stat-label">No Messages</div>
-      <div class="stat-pct">${pct(neverChatted, total)} of matches</div>
-    </div>
-
-    <div class="stat-card green">
-      <div class="stat-number">${weMet}</div>
-      <div class="stat-label">We Met 🎉</div>
-      <div class="stat-pct">${pct(weMet, chatted)} of conversations</div>
-    </div>
-
-    <div class="stat-card amber">
-      <div class="stat-number">${theyUnmatchedMe}</div>
-      <div class="stat-label">They Unmatched Me</div>
-      <div class="stat-pct">${pct(theyUnmatchedMe, chatted)} of conversations</div>
-    </div>
-
-    <div class="stat-card red">
-      <div class="stat-number">${unmatched}</div>
-      <div class="stat-label">I Unmatched</div>
-      <div class="stat-pct">${pct(unmatched, chatted)} of conversations</div>
-    </div>
-
-    <div class="stat-card blue">
-      <div class="stat-number">${avgMessages}</div>
-      <div class="stat-label">Avg Messages</div>
-      <div class="stat-pct">per conversation</div>
-    </div>
-
-    <div class="stat-card blue">
-      <div class="stat-number">${maxMessages}</div>
-      <div class="stat-label">Longest Convo</div>
-      <div class="stat-pct">messages</div>
-    </div>
-  `;
+  calendarHeatmap.appendChild(chunks);
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
@@ -320,9 +285,9 @@ function resetDashboard() {
   dashboard.classList.add('hidden');
   uploadSection.classList.remove('hidden');
   fileInput.value = '';
-  statsCards.innerHTML = '';
   if (yearFilters) yearFilters.innerHTML = '';
   if (monthFilters) monthFilters.innerHTML = '';
+  if (calendarHeatmap) calendarHeatmap.innerHTML = '';
   sourceData = null;
   selectedYears = new Set();
   selectedMonths = new Set();
@@ -406,6 +371,79 @@ function createFilterButton(label, active, onClick) {
   button.textContent = label;
   button.addEventListener('click', onClick);
   return button;
+}
+
+function refreshHeatmapMetricButtons() {
+  if (heatmapLikesBtn) {
+    heatmapLikesBtn.classList.toggle('active', heatmapMetric === 'likes');
+  }
+  if (heatmapMatchesBtn) {
+    heatmapMatchesBtn.classList.toggle('active', heatmapMetric === 'matches');
+  }
+}
+
+function getTimestampFromArray(value) {
+  if (!Array.isArray(value) || value.length === 0) return '';
+  const first = value[0];
+  if (!first || typeof first !== 'object') return '';
+  return typeof first.timestamp === 'string' ? first.timestamp : '';
+}
+
+function getMetricTimestamp(item, metric) {
+  return metric === 'likes'
+    ? getTimestampFromArray(item.like)
+    : getTimestampFromArray(item.match);
+}
+
+function isDateSelected(date) {
+  return selectedYears.has(date.getFullYear()) && selectedMonths.has(date.getMonth() + 1);
+}
+
+function buildActivitySeries(data) {
+  const dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayFromJs = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const monthly = { likes: {}, matches: {} };
+  const yearly = { likes: {}, matches: {} };
+  const dayOfWeek = {
+    likes: Object.fromEntries(dayKeys.map(day => [day, 0])),
+    matches: Object.fromEntries(dayKeys.map(day => [day, 0])),
+  };
+  const hourly = {
+    likes: new Array(24).fill(0),
+    matches: new Array(24).fill(0),
+  };
+
+  for (const item of data) {
+    const likesDate = parseHingeDate(getMetricTimestamp(item, 'likes'));
+    if (likesDate) {
+      const monthKey = `${likesDate.getFullYear()}-${String(likesDate.getMonth() + 1).padStart(2, '0')}`;
+      const yearKey = String(likesDate.getFullYear());
+      monthly.likes[monthKey] = (monthly.likes[monthKey] || 0) + 1;
+      yearly.likes[yearKey] = (yearly.likes[yearKey] || 0) + 1;
+      dayOfWeek.likes[dayFromJs[likesDate.getDay()]]++;
+      hourly.likes[likesDate.getHours()]++;
+    }
+
+    const matchesDate = parseHingeDate(getMetricTimestamp(item, 'matches'));
+    if (matchesDate) {
+      const monthKey = `${matchesDate.getFullYear()}-${String(matchesDate.getMonth() + 1).padStart(2, '0')}`;
+      const yearKey = String(matchesDate.getFullYear());
+      monthly.matches[monthKey] = (monthly.matches[monthKey] || 0) + 1;
+      yearly.matches[yearKey] = (yearly.matches[yearKey] || 0) + 1;
+      dayOfWeek.matches[dayFromJs[matchesDate.getDay()]]++;
+      hourly.matches[matchesDate.getHours()]++;
+    }
+  }
+
+  return { monthly, yearly, dayOfWeek, hourly };
+}
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function clearDateFilters() {

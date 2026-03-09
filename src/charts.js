@@ -1,13 +1,72 @@
 import { Chart, registerables } from 'chart.js';
 
-Chart.register(...registerables);
+const valueLabelPlugin = {
+  id: 'valueLabelPlugin',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+
+    ctx.save();
+    ctx.font = "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillStyle = '#111827';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    chart.data.datasets.forEach((dataset, datasetIndex) => {
+      const meta = chart.getDatasetMeta(datasetIndex);
+      meta.data.forEach((barElement, index) => {
+        const value = Number(dataset.data[index] || 0);
+        if (value <= 0) return;
+
+        const props = barElement.getProps(['x', 'y', 'base', 'height'], true);
+        const segmentStart = Math.min(props.x, props.base);
+        const segmentEnd = Math.max(props.x, props.base);
+        const segmentWidth = segmentEnd - segmentStart;
+
+        const text = `${value}`;
+        const textWidth = ctx.measureText(text).width;
+        const chipPaddingX = 6;
+        const chipPaddingY = 3;
+        const chipWidth = textWidth + chipPaddingX * 2;
+        const chipHeight = Math.max(14, props.height - 2);
+
+        if (segmentWidth < chipWidth + 6) return;
+
+        const chipX = segmentStart + 4;
+        const chipY = props.y - chipHeight / 2;
+
+        roundRect(ctx, chipX, chipY, chipWidth, chipHeight, 4);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fill();
+        ctx.strokeStyle = '#4b5563';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#111827';
+        ctx.fillText(text, chipX + chipPaddingX, props.y);
+      });
+    });
+
+    ctx.restore();
+  },
+};
+
+function roundRect(ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+Chart.register(...registerables, valueLabelPlugin);
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const COLORS = {
-  primary:   '#e8234a',
+  primary:   '#7c3aed',
   blue:      '#3b82f6',
-  green:     '#10b981',
-  amber:     '#f59e0b',
 };
 
 const BASE_FONT = {
@@ -30,23 +89,26 @@ function destroyIfExists(id) {
 // ── Monthly timeline ─────────────────────────────────────────────────────────
 
 /**
- * Renders a bar chart of matches per calendar month.
+ * Renders a stacked horizontal bar chart of likes sent vs matches made per month.
  *
  * @param {string} canvasId
- * @param {Record<string, number>} monthlyMatches  YYYY-MM → count
+ * @param {Record<string, number>} likesByMonth  YYYY-MM → count
+ * @param {Record<string, number>} matchesByMonth  YYYY-MM → count
  */
-export function renderMonthlyChart(canvasId, monthlyMatches) {
+export function renderMonthlyChart(canvasId, likesByMonth, matchesByMonth) {
   destroyIfExists(canvasId);
 
-  const sortedMonths = Object.keys(monthlyMatches).sort();
+  const sortedMonths = Array.from(
+    new Set([...Object.keys(likesByMonth), ...Object.keys(matchesByMonth)])
+  ).sort();
   const labels = sortedMonths.map(m => {
     const [year, month] = m.split('-');
     return new Date(+year, +month - 1, 1).toLocaleString('default', {
       month: 'short',
-      year: '2-digit',
     });
   });
-  const values = sortedMonths.map(m => monthlyMatches[m]);
+  const likesValues = sortedMonths.map(m => likesByMonth[m] || 0);
+  const matchesValues = sortedMonths.map(m => matchesByMonth[m] || 0);
 
   const ctx = document.getElementById(canvasId);
   chartInstances[canvasId] = new Chart(ctx, {
@@ -55,31 +117,40 @@ export function renderMonthlyChart(canvasId, monthlyMatches) {
       labels,
       datasets: [
         {
-          label: 'Matches',
-          data: values,
+          label: 'Matches Made',
+          data: matchesValues,
           backgroundColor: COLORS.primary,
-          borderRadius: 5,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'Likes Sent',
+          data: likesValues,
+          backgroundColor: COLORS.blue,
+          borderRadius: 4,
           borderSkipped: false,
         },
       ],
     },
-    options: commonBarOptions('Matches'),
+    options: commonStackedHorizontalOptions(),
   });
 }
 
 // ── Day of week ───────────────────────────────────────────────────────────────
 
 /**
- * Renders a bar chart of matches by day of the week.
+ * Renders a stacked horizontal bar chart of likes sent vs matches made by day.
  *
  * @param {string} canvasId
- * @param {Record<string, number>} dayOfWeekCounts
+ * @param {Record<string, number>} likesByDay
+ * @param {Record<string, number>} matchesByDay
  */
-export function renderDayOfWeekChart(canvasId, dayOfWeekCounts) {
+export function renderDayOfWeekChart(canvasId, likesByDay, matchesByDay) {
   destroyIfExists(canvasId);
 
   const days   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const values = days.map(d => dayOfWeekCounts[d] || 0);
+  const likesValues = days.map(d => likesByDay[d] || 0);
+  const matchesValues = days.map(d => matchesByDay[d] || 0);
 
   const ctx = document.getElementById(canvasId);
   chartInstances[canvasId] = new Chart(ctx, {
@@ -88,95 +159,85 @@ export function renderDayOfWeekChart(canvasId, dayOfWeekCounts) {
       labels: days,
       datasets: [
         {
-          label: 'Matches',
-          data: values,
+          label: 'Matches Made',
+          data: matchesValues,
+          backgroundColor: COLORS.primary,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'Likes Sent',
+          data: likesValues,
           backgroundColor: COLORS.blue,
-          borderRadius: 5,
+          borderRadius: 4,
           borderSkipped: false,
         },
       ],
     },
-    options: commonBarOptions('Matches'),
+    options: commonStackedHorizontalOptions(),
   });
 }
 
 // ── Conversation length distribution ─────────────────────────────────────────
 
 /**
- * Renders a histogram of conversation lengths (message counts).
+ * Renders a stacked horizontal bar chart of likes sent vs matches made by year.
  *
  * @param {string} canvasId
- * @param {number[]} conversationLengths
+ * @param {Record<string, number>} likesByYear
+ * @param {Record<string, number>} matchesByYear
  */
-export function renderConvLengthChart(canvasId, conversationLengths) {
+export function renderConvLengthChart(canvasId, likesByYear, matchesByYear) {
   destroyIfExists(canvasId);
 
-  const buckets = [
-    { label: '1',    min: 1,  max: 1         },
-    { label: '2–5',  min: 2,  max: 5         },
-    { label: '6–10', min: 6,  max: 10        },
-    { label: '11–20', min: 11, max: 20        },
-    { label: '21–50', min: 21, max: 50        },
-    { label: '51+',  min: 51, max: Infinity  },
-  ];
-
-  const counts = buckets.map(b =>
-    conversationLengths.filter(v => v >= b.min && v <= b.max).length
-  );
+  const years = Array.from(
+    new Set([...Object.keys(likesByYear), ...Object.keys(matchesByYear)])
+  ).sort();
+  const likesValues = years.map(y => likesByYear[y] || 0);
+  const matchesValues = years.map(y => matchesByYear[y] || 0);
 
   const ctx = document.getElementById(canvasId);
   chartInstances[canvasId] = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: buckets.map(b => b.label),
+      labels: years,
       datasets: [
         {
-          label: 'Conversations',
-          data: counts,
-          backgroundColor: COLORS.green,
-          borderRadius: 5,
+          label: 'Matches Made',
+          data: matchesValues,
+          backgroundColor: COLORS.primary,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'Likes Sent',
+          data: likesValues,
+          backgroundColor: COLORS.blue,
+          borderRadius: 4,
           borderSkipped: false,
         },
       ],
     },
-    options: {
-      ...commonBarOptions('Conversations'),
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: 'Messages exchanged',
-            font: BASE_FONT,
-            color: '#6b7280',
-          },
-          grid:  { display: false },
-          ticks: { font: BASE_FONT },
-        },
-        y: {
-          beginAtZero: true,
-          grid:  { color: GRID_COLOR },
-          ticks: { font: BASE_FONT, stepSize: 1 },
-        },
-      },
-    },
+    options: commonStackedHorizontalOptions(),
   });
 }
 
 // ── Matches by hour ───────────────────────────────────────────────────────────
 
 /**
- * Renders a bar chart of matches by hour of the day (0–23).
+ * Renders a stacked horizontal bar chart of likes sent vs matches made by hour.
  *
  * @param {string} canvasId
- * @param {number[]} hourlyCounts  24-element array indexed by hour
+ * @param {number[]} likesHourly  24-element array indexed by hour
+ * @param {number[]} matchesHourly  24-element array indexed by hour
  */
-export function renderHourlyChart(canvasId, hourlyCounts) {
+export function renderHourlyChart(canvasId, likesHourly, matchesHourly) {
   destroyIfExists(canvasId);
 
   const labels = Array.from({ length: 24 }, (_, i) => {
     const h = i % 12 || 12;
     const suffix = i < 12 ? 'am' : 'pm';
-    return i % 6 === 0 ? `${h}${suffix}` : '';
+    return `${h}${suffix}`;
   });
 
   const ctx = document.getElementById(canvasId);
@@ -186,44 +247,54 @@ export function renderHourlyChart(canvasId, hourlyCounts) {
       labels,
       datasets: [
         {
-          label: 'Matches',
-          data: hourlyCounts,
-          backgroundColor: COLORS.amber,
+          label: 'Matches Made',
+          data: matchesHourly,
+          backgroundColor: COLORS.primary,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'Likes Sent',
+          data: likesHourly,
+          backgroundColor: COLORS.blue,
           borderRadius: 4,
           borderSkipped: false,
         },
       ],
     },
-    options: commonBarOptions('Matches'),
+    options: commonStackedHorizontalOptions(),
   });
 }
 
 // ── Shared options helper ─────────────────────────────────────────────────────
 
 /**
- * Common Chart.js options for bar charts.
- * @param {string} unit  Label for individual items (used in tooltip)
+ * Common Chart.js options for stacked horizontal charts.
  */
-function commonBarOptions(unit) {
+function commonStackedHorizontalOptions() {
   return {
+    indexAxis: 'y',
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: { display: true },
       tooltip: {
         callbacks: {
-          label: ctx => `${ctx.raw} ${unit.toLowerCase()}`,
+          label: ctx => `${ctx.dataset.label}: ${ctx.raw}`,
         },
       },
     },
     scales: {
       x: {
-        grid:  { display: false },
-        ticks: { font: BASE_FONT, maxRotation: 45 },
+        stacked: true,
+        beginAtZero: true,
+        grid: { color: GRID_COLOR },
+        ticks: { display: false },
       },
       y: {
-        beginAtZero: true,
-        grid:  { color: GRID_COLOR },
-        ticks: { font: BASE_FONT, stepSize: 1 },
+        stacked: true,
+        grid: { display: false },
+        ticks: { font: BASE_FONT },
       },
     },
   };
