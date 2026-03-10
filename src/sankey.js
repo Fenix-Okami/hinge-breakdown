@@ -1,5 +1,5 @@
-import { select } from 'd3-selection';
-import { sankey as createSankey, sankeyLinkHorizontal, sankeyJustify } from 'd3-sankey';
+import { select, pointer } from 'd3-selection';
+import { sankey as createSankey, sankeyLinkHorizontal, sankeyLeft } from 'd3-sankey';
 
 /** Node colour palette (keyed by node id) */
 const NODE_COLORS = {
@@ -7,33 +7,27 @@ const NODE_COLORS = {
   received:  '#06b6d4', // Cyan       – Likes Received
   sentcomment: '#60a5fa', // Light blue – Sent with comment
   sentblank: '#1d4ed8', // Dark blue  – Sent blank
-  receivedcomment: '#67e8f9', // Light cyan – Received with comment
-  receivedblank: '#0891b2', // Dark cyan – Received blank
   matched:   '#7c3aed', // Burple     – Matched
-  likeignored: '#ef4444', // Red      – Sent like ignored
-  receivedignored: '#9ca3af', // Gray – Received like ignored by you / expired
+  ignored: '#ef4444', // Red      – Ignored
   chatted:   '#3b82f6', // Blue       – Had a conversation
   never:     '#9ca3af', // Gray       – No chat after matching
   wemet:     '#10b981', // Green      – We Met
-  unmatched: '#ef4444', // Red        – Unmatched / removed
-  theyunmatched: '#f59e0b', // Amber  – They unmatched me
+  unmatched: '#f59e0b', // Amber      – I unmatched
+  theyunmatched: '#ef4444', // Red    – They unmatched me
 };
 
 const NODE_ORDER = {
-  sent: 1,
-  received: 2,
+  received: 1,
+  sent: 2,
   sentcomment: 3,
   sentblank: 4,
-  receivedcomment: 5,
-  receivedblank: 6,
-  likeignored: 7,
-  matched: 8,
+  matched: 7,
+  ignored: 8,
   chatted: 9,
-  wemet: 10,
-  unmatched: 11,
-  theyunmatched: 12,
-  never: 13,
-  receivedignored: 14,
+  never: 10,
+  wemet: 11,
+  unmatched: 12,
+  theyunmatched: 13,
 };
 
 /**
@@ -88,6 +82,8 @@ export function renderSankey(container, stats) {
   } = stats;
   const likesSentIgnored = likesSentWithCommentIgnored + likesSentBlankIgnored;
   const likesReceivedIgnored = likesReceivedWithCommentIgnored + likesReceivedBlankIgnored;
+  const ignoredTotal = likesSentIgnored + likesReceivedIgnored;
+  const likesReceivedMatched = likesReceivedWithCommentMatched + likesReceivedBlankMatched;
   const flowTotal = likesSent + likesReceived;
 
   // Clear any previous render
@@ -98,40 +94,31 @@ export function renderSankey(container, stats) {
 
   /** @type {{id: string, name: string, color: string}[]} */
   const nodeDefinitions = [
-    likesSent > 0 && { id: 'sent', name: 'Likes Sent' },
-    likesReceived > 0 && { id: 'received', name: 'Likes Received' },
-    likesSentWithComment > 0 && { id: 'sentcomment', name: 'Sent w/ Comment' },
-    likesSentBlank > 0 && { id: 'sentblank', name: 'Sent Blank' },
-    likesReceivedWithComment > 0 && { id: 'receivedcomment', name: 'Received w/ Comment' },
-    likesReceivedBlank > 0 && { id: 'receivedblank', name: 'Received Blank' },
+    likesSent > 0 && { id: 'sent', name: 'Likes sent' },
+    likesReceived > 0 && { id: 'received', name: 'Likes received' },
+    likesSentWithComment > 0 && { id: 'sentcomment', name: 'W/ Opener' },
+    likesSentBlank > 0 && { id: 'sentblank', name: 'W/O Opener' },
+    ignoredTotal > 0 && { id: 'ignored', name: 'Ignored' },
     matchedTotal > 0 && { id: 'matched', name: 'Matched' },
-    likesSentIgnored > 0 && { id: 'likeignored', name: 'Like Ignored' },
-    likesReceivedIgnored > 0 && { id: 'receivedignored', name: 'Received Like Ignored' },
     matchedChatted > 0 && { id: 'chatted', name: 'Chatted' },
-    matchedNoChat > 0 && { id: 'never', name: 'No Chat' },
-    weMet       > 0 && { id: 'wemet',     name: 'We Met 🎉'      },
-    unmatched   > 0 && { id: 'unmatched', name: 'I Unmatched'    },
-    theyUnmatchedMe > 0 && { id: 'theyunmatched', name: 'They Unmatched Me' },
+    matchedNoChat > 0 && { id: 'never', name: 'No chat' },
+    weMet       > 0 && { id: 'wemet',     name: 'Met with'      },
+    unmatched   > 0 && { id: 'unmatched', name: 'I unmatched'   },
+    theyUnmatchedMe > 0 && { id: 'theyunmatched', name: 'They unmatched me' },
   ].filter(Boolean);
 
   const linkDefinitions = [
     likesSentWithComment > 0 && { source: 'sent', target: 'sentcomment', value: likesSentWithComment },
     likesSentBlank > 0 && { source: 'sent', target: 'sentblank', value: likesSentBlank },
 
-    likesReceivedWithComment > 0 && { source: 'received', target: 'receivedcomment', value: likesReceivedWithComment },
-    likesReceivedBlank > 0 && { source: 'received', target: 'receivedblank', value: likesReceivedBlank },
-
     likesSentWithCommentMatched > 0 && { source: 'sentcomment', target: 'matched', value: likesSentWithCommentMatched },
-    likesSentWithCommentIgnored > 0 && { source: 'sentcomment', target: 'likeignored', value: likesSentWithCommentIgnored },
+    likesSentWithCommentIgnored > 0 && { source: 'sentcomment', target: 'ignored', value: likesSentWithCommentIgnored },
 
     likesSentBlankMatched > 0 && { source: 'sentblank', target: 'matched', value: likesSentBlankMatched },
-    likesSentBlankIgnored > 0 && { source: 'sentblank', target: 'likeignored', value: likesSentBlankIgnored },
+    likesSentBlankIgnored > 0 && { source: 'sentblank', target: 'ignored', value: likesSentBlankIgnored },
 
-    likesReceivedWithCommentMatched > 0 && { source: 'receivedcomment', target: 'matched', value: likesReceivedWithCommentMatched },
-    likesReceivedWithCommentIgnored > 0 && { source: 'receivedcomment', target: 'receivedignored', value: likesReceivedWithCommentIgnored },
-
-    likesReceivedBlankMatched > 0 && { source: 'receivedblank', target: 'matched', value: likesReceivedBlankMatched },
-    likesReceivedBlankIgnored > 0 && { source: 'receivedblank', target: 'receivedignored', value: likesReceivedBlankIgnored },
+    likesReceivedMatched > 0 && { source: 'received', target: 'matched', value: likesReceivedMatched },
+    likesReceivedIgnored > 0 && { source: 'received', target: 'ignored', value: likesReceivedIgnored },
 
     matchedChatted > 0 && { source: 'matched', target: 'chatted', value: matchedChatted },
     matchedNoChat > 0 && { source: 'matched', target: 'never', value: matchedNoChat },
@@ -163,16 +150,33 @@ export function renderSankey(container, stats) {
   const width      = container.offsetWidth || 760;
   // Scale height with total flow volume, clamped to a reasonable range
   const height     = Math.max(300, Math.min(620, Math.round(flowTotal * 3.1)));
-  const margin     = { top: 16, right: 28, bottom: 16, left: 16 };
+  const margin     = { top: 16, right: 28, bottom: 16, left: 220 };
   const innerW     = width  - margin.left - margin.right;
   const innerH     = height - margin.top  - margin.bottom;
 
   // ── Layout ────────────────────────────────────────────────────────────────
   const sankeyLayout = createSankey()
-    .nodeAlign(sankeyJustify)
+    .nodeAlign(sankeyLeft)
     .nodeWidth(22)
     .nodePadding(26)
     .nodeSort((a, b) => (NODE_ORDER[a.id] || 999) - (NODE_ORDER[b.id] || 999))
+    .linkSort((a, b) => {
+      const rank = (link) => {
+        const targetId = link.target?.id;
+        const sourceId = link.source?.id;
+        if (targetId === 'matched' && sourceId === 'received') return 0;
+        if (targetId === 'matched' && sourceId === 'sentcomment') return 1;
+        if (targetId === 'matched' && sourceId === 'sentblank') return 2;
+        if (targetId === 'chatted') return 3;
+        if (targetId === 'ignored') return 4;
+        if (targetId === 'never') return 5;
+        if (targetId === 'wemet') return 6;
+        if (targetId === 'unmatched') return 7;
+        if (targetId === 'theyunmatched') return 8;
+        return 20;
+      };
+      return rank(a) - rank(b);
+    })
     .extent([[0, 0], [innerW, innerH]]);
 
   const graph = sankeyLayout({
@@ -193,22 +197,114 @@ export function renderSankey(container, stats) {
     .append('g')
     .attr('transform', `translate(${margin.left},${margin.top})`);
 
+  const defs = svg.append('defs');
+  const gradientIdPrefix = `link-gradient-${Math.random().toString(36).slice(2, 10)}`;
+
+  const hoverCallout = g
+    .append('g')
+    .style('pointer-events', 'none')
+    .style('opacity', 0);
+
+  const hoverBg = hoverCallout
+    .append('rect')
+    .attr('rx', 10)
+    .attr('ry', 10)
+    .attr('fill', 'rgba(255,255,255,0.95)')
+    .attr('stroke', '#c7d2fe')
+    .attr('stroke-width', 1.5)
+    .attr('filter', 'drop-shadow(0 6px 10px rgba(60, 30, 120, 0.18))');
+
+  const hoverValue = hoverCallout
+    .append('text')
+    .attr('text-anchor', 'middle')
+    .attr('font-size', '28px')
+    .attr('font-weight', '800')
+    .attr('font-family', 'inherit')
+    .attr('fill', '#312e81');
+
+  function showHoverCallout(x, y, value, color) {
+    hoverValue
+      .text(String(value))
+      .attr('x', 0)
+      .attr('y', 6)
+      .attr('fill', color || '#312e81');
+
+    const valueBox = hoverValue.node().getBBox();
+    const boxWidth = valueBox.width + 26;
+    const boxHeight = 44;
+
+    const minX = boxWidth / 2;
+    const maxX = innerW - boxWidth / 2;
+    const minY = boxHeight / 2;
+    const maxY = innerH - boxHeight / 2;
+    const clampedX = Math.max(minX, Math.min(maxX, x));
+    const clampedY = Math.max(minY, Math.min(maxY, y - 26));
+
+    hoverBg
+      .attr('x', -boxWidth / 2)
+      .attr('y', -boxHeight / 2)
+      .attr('width', boxWidth)
+      .attr('height', boxHeight);
+
+    hoverCallout
+      .attr('transform', `translate(${clampedX},${clampedY})`)
+      .style('opacity', 1);
+
+    hoverCallout.raise();
+  }
+
+  function hideHoverCallout() {
+    hoverCallout.style('opacity', 0);
+  }
+
   // ── Links ─────────────────────────────────────────────────────────────────
   const linkGroup = g.append('g').attr('fill', 'none');
+
+  const linkGradients = defs
+    .selectAll('linearGradient')
+    .data(graph.links)
+    .join('linearGradient')
+    .attr('id', (_d, i) => `${gradientIdPrefix}-${i}`)
+    .attr('gradientUnits', 'userSpaceOnUse')
+    .attr('x1', d => d.source.x1 + margin.left)
+    .attr('x2', d => d.target.x0 + margin.left)
+    .attr('y1', d => d.y0 + margin.top)
+    .attr('y2', d => d.y1 + margin.top);
+
+  linkGradients
+    .selectAll('stop')
+    .data(d => [
+      { offset: '0%', color: d.source.color },
+      { offset: '100%', color: d.target.color },
+    ])
+    .join('stop')
+    .attr('offset', d => d.offset)
+    .attr('stop-color', d => d.color);
 
   linkGroup
     .selectAll('path')
     .data(graph.links)
     .join('path')
     .attr('d', sankeyLinkHorizontal())
-    .attr('stroke',       d => d.source.color)
+    .attr('stroke',       (_d, i) => `url(#${gradientIdPrefix}-${i})`)
     .attr('stroke-width', d => Math.max(1, d.width))
-    .attr('opacity', 0.38)
-    .on('mouseenter', function () {
-      select(this).attr('opacity', 0.68);
+    .attr('opacity', 0.58)
+    .on('mouseenter', function (event, d) {
+      const [mx, my] = pointer(event, g.node());
+      select(this)
+        .attr('opacity', 0.95)
+        .attr('stroke-width', Math.max(2, d.width + 2));
+      showHoverCallout(mx, my, d.value, d.target.color);
     })
-    .on('mouseleave', function () {
-      select(this).attr('opacity', 0.38);
+    .on('mousemove', function (event, d) {
+      const [mx, my] = pointer(event, g.node());
+      showHoverCallout(mx, my, d.value, d.target.color);
+    })
+    .on('mouseleave', function (event, d) {
+      select(this)
+        .attr('opacity', 0.58)
+        .attr('stroke-width', Math.max(1, d.width));
+      hideHoverCallout();
     })
     .append('title')
     .text(d => `${d.source.name} → ${d.target.name}: ${d.value} matches`);
@@ -233,32 +329,46 @@ export function renderSankey(container, stats) {
     .text(d => `${d.name}: ${d.value} matches`);
 
   // ── Labels ────────────────────────────────────────────────────────────────
-  const isLeft = d => d.x0 < innerW / 2;
+  const labelGroup = nodeGroup
+    .append('g')
+    .attr('transform', d => `translate(${d.x0 - 12},${(d.y0 + d.y1) / 2})`);
 
-  const labels = nodeGroup
+  labelGroup
     .append('text')
-    .attr('x',           d => isLeft(d) ? d.x1 + 12 : d.x0 - 12)
-    .attr('y',           d => (d.y0 + d.y1) / 2)
-    .attr('dy',          '0.35em')
-    .attr('text-anchor', d => isLeft(d) ? 'start' : 'end')
-    .attr('font-size',   '15px')
-    .attr('font-weight', '600')
-    .attr('font-family', "inherit")
-    .attr('fill',        '#1a1a2e')
-    .text(d => `${d.name} (${d.value})`);
+    .attr('x', 0)
+    .attr('y', -10)
+    .attr('text-anchor', 'end')
+    .attr('font-size', '15px')
+    .attr('font-weight', '700')
+    .attr('font-family', 'inherit')
+    .attr('fill', '#111827')
+    .text(d => d.name);
 
-  labels.each(function () {
-    const label = select(this);
+  const valueText = labelGroup
+    .append('text')
+    .attr('x', 0)
+    .attr('y', 12)
+    .attr('text-anchor', 'end')
+    .attr('font-size', '14px')
+    .attr('font-weight', '800')
+    .attr('font-family', 'inherit')
+    .attr('fill', d => d.color)
+    .text(d => String(d.value));
+
+  valueText.each(function () {
+    const value = select(this);
     const box = this.getBBox();
     select(this.parentNode)
       .insert('rect', 'text')
-      .attr('x', box.x - 6)
-      .attr('y', box.y - 3)
-      .attr('width', box.width + 12)
-      .attr('height', box.height + 6)
-      .attr('rx', 5)
-      .attr('ry', 5)
-      .attr('fill', 'rgba(255,255,255,0.82)');
-    label.raise();
+      .attr('x', box.x - 9)
+      .attr('y', box.y - 4)
+      .attr('width', box.width + 18)
+      .attr('height', box.height + 8)
+      .attr('rx', 8)
+      .attr('ry', 8)
+      .attr('fill', 'rgba(255,255,255,0.96)')
+      .attr('stroke', d => d.color)
+      .attr('stroke-width', 1.2);
+    value.raise();
   });
 }

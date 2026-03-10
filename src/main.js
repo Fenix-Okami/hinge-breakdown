@@ -28,11 +28,19 @@ const clearDateFiltersBtn = document.getElementById('clear-date-filters');
 const calendarHeatmap = document.getElementById('calendar-heatmap');
 const heatmapLikesBtn = document.getElementById('heatmap-likes-btn');
 const heatmapMatchesBtn = document.getElementById('heatmap-matches-btn');
+const sankeyMetrics = document.getElementById('sankey-metrics');
+const openerInsights = document.getElementById('opener-insights');
+const conversationInsights = document.getElementById('conversation-insights');
+const conversationOutcomeFilters = document.getElementById('conversation-outcome-filters');
+const conversationList = document.getElementById('conversation-list');
+const conversationViewer = document.getElementById('conversation-viewer');
 
 let sourceData = null;
 let selectedYears = new Set();
 let selectedMonths = new Set();
 let heatmapMetric = 'likes';
+let selectedConversationOutcome = 'met';
+let selectedConversationIndex = 0;
 
 const MONTHS = [
   { key: 1, label: 'Jan' },
@@ -174,6 +182,8 @@ function renderFilteredDashboard() {
   renderCalendarHeatmap(filteredData, heatmapMetric);
 
   const activitySeries = buildActivitySeries(filteredData);
+  renderSankeyMetrics(stats);
+  renderBottomInsights(filteredData);
 
   const sankeyContainer = document.getElementById('sankey-chart');
   renderSankey(sankeyContainer, stats);
@@ -452,6 +462,253 @@ function clearDateFilters() {
   const years = sourceData ? getAvailableYears(sourceData) : [];
   refreshFilterUI(years);
   renderFilteredDashboard();
+}
+
+function percent(numerator, denominator) {
+  if (!denominator) return 0;
+  return (numerator / denominator) * 100;
+}
+
+function formatPercent(value) {
+  return `${value.toFixed(1)}%`;
+}
+
+function renderSankeyMetrics(stats) {
+  if (!sankeyMetrics) return;
+
+  const totalLikes = stats.likesSent + stats.likesReceived;
+  const matchedAll = stats.likesSentMatched + stats.likesReceivedMatched;
+  const ignoredAll = stats.likesSentIgnored + stats.likesReceivedIgnored;
+  const allTotal = matchedAll + ignoredAll;
+  const overallMatchRate = percent(matchedAll, allTotal);
+  const likesPerMatch = matchedAll > 0 ? (totalLikes / matchedAll) : null;
+
+  const withOpenerTotal = stats.likesSentWithCommentMatched + stats.likesSentWithCommentIgnored;
+  const withoutOpenerTotal = stats.likesSentBlankMatched + stats.likesSentBlankIgnored;
+  const withOpenerMatchRate = percent(stats.likesSentWithCommentMatched, withOpenerTotal);
+  const withoutOpenerMatchRate = percent(stats.likesSentBlankMatched, withoutOpenerTotal);
+
+  const likesSent = stats.likesSent;
+  const dates = stats.weMet;
+  const likesPerDate = dates > 0 ? (likesSent / dates) : null;
+  const dateRate = percent(dates, likesSent);
+
+  const likeToMatchText = matchedAll > 0
+    ? `1 match per ${likesPerMatch.toFixed(1)} likes`
+    : 'No matches in current filter';
+  const dateRatioText = dates > 0
+    ? `1 date per ${likesPerDate.toFixed(1)} likes sent`
+    : 'No we met outcomes in filter';
+
+  sankeyMetrics.innerHTML = `
+    <article class="sankey-metric-card metric-blue">
+      <h4>Overall <span class="metric-like">like</span> to <span class="metric-match">match</span> ratio</h4>
+      <p class="metric-value">${likeToMatchText}</p>
+      <p class="metric-sub">${formatPercent(overallMatchRate)} match rate across sent + received likes</p>
+    </article>
+    <article class="sankey-metric-card metric-purple">
+      <h4><span class="metric-match">Match</span> rate (sent likes only)</h4>
+      <p class="metric-value">W/ opener ${formatPercent(withOpenerMatchRate)}</p>
+      <p class="metric-value">W/O opener ${formatPercent(withoutOpenerMatchRate)}</p>
+    </article>
+    <article class="sankey-metric-card metric-green">
+      <h4><span class="metric-like">Like</span> to <span class="metric-date">date</span> ratio</h4>
+      <p class="metric-value">${dateRatioText}</p>
+      <p class="metric-sub">${formatPercent(dateRate)} of likes sent ended in we met</p>
+    </article>
+  `;
+}
+
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function extractSentOpener(match) {
+  const outerLike = Array.isArray(match.like) ? match.like[0] : null;
+  if (!outerLike || typeof outerLike !== 'object') return '';
+
+  if (typeof outerLike.comment === 'string') {
+    return normalizeText(outerLike.comment);
+  }
+
+  const nestedLike = Array.isArray(outerLike.like) ? outerLike.like[0] : null;
+  if (nestedLike && typeof nestedLike === 'object' && typeof nestedLike.comment === 'string') {
+    return normalizeText(nestedLike.comment);
+  }
+
+  return '';
+}
+
+function startsWithRemove(value) {
+  return typeof value === 'string' && value.trim().toLowerCase().startsWith('remove');
+}
+
+function renderBottomInsights(data) {
+  renderOpenerInsights(data);
+  renderConversationInsights(data);
+}
+
+function renderOpenerInsights(data) {
+  if (!openerInsights) return;
+
+  const openerMap = new Map();
+
+  for (const item of data) {
+    const hasLike = Array.isArray(item.like) && item.like.length > 0;
+    const hasMatch = Array.isArray(item.match) && item.match.length > 0;
+    if (!hasLike) continue;
+    if (!hasMatch) continue;
+    const opener = extractSentOpener(item);
+    if (!opener || startsWithRemove(opener)) continue;
+    const key = opener.toLowerCase();
+    if (!openerMap.has(key)) {
+      openerMap.set(key, opener);
+    }
+  }
+
+  const openers = Array.from(openerMap.values());
+
+  if (openers.length === 0) {
+    openerInsights.innerHTML = '<p class="insight-empty">No sent openers that converted to matches in this filter.</p>';
+    return;
+  }
+
+  const listItems = openers.map(opener => {
+    return `
+      <li class="opener-item" title="${opener.replace(/"/g, '&quot;')}">
+        <span class="opener-text">${opener}</span>
+      </li>
+    `;
+  }).join('');
+
+  openerInsights.innerHTML = `<ul class="opener-list">${listItems}</ul>`;
+}
+
+function renderConversationInsights(data) {
+  if (!conversationInsights || !conversationOutcomeFilters || !conversationList || !conversationViewer) return;
+
+  const outcomes = [
+    { key: 'met', label: 'We met' },
+    { key: 'iunmatched', label: 'I unmatched' },
+    { key: 'theyunmatched', label: 'They unmatched' },
+  ];
+
+  const buckets = {
+    met: [],
+    iunmatched: [],
+    theyunmatched: [],
+  };
+
+  for (const item of data) {
+    const chats = Array.isArray(item.chats) ? item.chats : [];
+    if (chats.length === 0) continue;
+
+    const hasWeMet = Array.isArray(item.we_met) && item.we_met.length > 0;
+    const hasBlock = Array.isArray(item.block) && item.block.length > 0;
+    const key = hasWeMet ? 'met' : hasBlock ? 'iunmatched' : 'theyunmatched';
+
+    const firstChat = chats.find(c => typeof c?.body === 'string' && c.body.trim().length > 0);
+    const preview = firstChat ? firstChat.body.trim() : '(No text content)';
+    buckets[key].push({
+      preview,
+      chats,
+    });
+  }
+
+  const availableOutcome = outcomes.find(outcome => buckets[outcome.key].length > 0);
+  if (!availableOutcome) {
+    conversationOutcomeFilters.innerHTML = '';
+    conversationList.innerHTML = '<p class="insight-empty">No conversations in this filter.</p>';
+    conversationViewer.innerHTML = '';
+    return;
+  }
+
+  if (!buckets[selectedConversationOutcome] || buckets[selectedConversationOutcome].length === 0) {
+    selectedConversationOutcome = availableOutcome.key;
+    selectedConversationIndex = 0;
+  }
+
+  conversationOutcomeFilters.innerHTML = outcomes.map(outcome => {
+    const count = buckets[outcome.key].length;
+    const activeClass = outcome.key === selectedConversationOutcome ? 'active' : '';
+    return `<button type="button" class="conversation-filter-btn ${activeClass}" data-outcome="${outcome.key}">${outcome.label} (${count})</button>`;
+  }).join('');
+
+  conversationOutcomeFilters.querySelectorAll('.conversation-filter-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const outcome = button.getAttribute('data-outcome');
+      if (!outcome || outcome === selectedConversationOutcome) return;
+      selectedConversationOutcome = outcome;
+      selectedConversationIndex = 0;
+      renderConversationInsights(data);
+    });
+  });
+
+  const conversations = buckets[selectedConversationOutcome] || [];
+  if (selectedConversationIndex >= conversations.length) selectedConversationIndex = 0;
+
+  conversationList.innerHTML = conversations.map((conversation, index) => {
+    const activeClass = index === selectedConversationIndex ? 'active' : '';
+    const trimmed = conversation.preview.length > 70
+      ? `${conversation.preview.slice(0, 70)}…`
+      : conversation.preview;
+    return `<button type="button" class="conversation-item-btn ${activeClass}" data-index="${index}">Chat ${index + 1}: ${trimmed}</button>`;
+  }).join('');
+
+  conversationList.querySelectorAll('.conversation-item-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      const index = Number.parseInt(button.getAttribute('data-index') || '-1', 10);
+      if (Number.isNaN(index)) return;
+      selectedConversationIndex = index;
+      renderConversationInsights(data);
+    });
+  });
+
+  const selectedConversation = conversations[selectedConversationIndex];
+  if (!selectedConversation) {
+    conversationViewer.innerHTML = '<p class="insight-empty">Select a conversation to view details.</p>';
+    return;
+  }
+
+  const orderedChats = selectedConversation.chats
+    .map((chat, index) => ({
+      chat,
+      index,
+      parsedDate: typeof chat?.timestamp === 'string' ? parseHingeDate(chat.timestamp) : null,
+    }))
+    .sort((a, b) => {
+      if (a.parsedDate && b.parsedDate) {
+        return a.parsedDate.getTime() - b.parsedDate.getTime();
+      }
+      if (a.parsedDate && !b.parsedDate) return -1;
+      if (!a.parsedDate && b.parsedDate) return 1;
+      return a.index - b.index;
+    });
+
+  const lines = orderedChats.map(({ chat, index, parsedDate }) => {
+    const body = typeof chat?.body === 'string' && chat.body.trim().length > 0
+      ? chat.body.trim()
+      : '(No text)';
+    const timeLabel = parsedDate
+      ? parsedDate.toLocaleString([], {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+      : '';
+    const speaker = 'You';
+    const bubbleClass = 'sent';
+
+    return `
+      <article class="chat-line ${bubbleClass}">
+        <div class="chat-meta">${speaker}${timeLabel ? ` · ${timeLabel}` : ''}</div>
+        <p>${body}</p>
+      </article>
+    `;
+  }).join('');
+
+  conversationViewer.innerHTML = `<div class="chat-thread">${lines}</div>`;
 }
 
 function createEmptyStats() {

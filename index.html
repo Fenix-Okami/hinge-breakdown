@@ -85,6 +85,7 @@
             <p class="chart-desc">
               Main view of how your matches moved from connection to outcomes
             </p>
+            <div id="sankey-metrics" class="sankey-metrics"></div>
             <div id="sankey-chart"></div>
           </div>
 
@@ -111,6 +112,25 @@
               <h3>Likes vs Matches by Hour of Day</h3>
               <p class="chart-desc">Each metric uses its own timestamp source</p>
               <canvas id="hourly-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card insights-card">
+            <h3>Opener & Conversation Insights</h3>
+            <p class="chart-desc">Patterns from the currently selected date filters</p>
+            <div class="insights-grid">
+              <section class="insight-panel">
+                <h4>Openers that lead to matches</h4>
+                <div id="opener-insights"></div>
+              </section>
+              <section class="insight-panel">
+                <h4>Conversation patterns by outcome</h4>
+                <div id="conversation-insights" class="conversation-explorer">
+                  <div id="conversation-outcome-filters" class="conversation-outcome-filters"></div>
+                  <div id="conversation-list" class="conversation-list"></div>
+                  <div id="conversation-viewer" class="conversation-viewer"></div>
+                </div>
+              </section>
             </div>
           </div>
         </section>

@@ -215,6 +215,217 @@ main {
   margin-bottom: 1.25rem;
 }
 
+.sankey-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.9rem 0 1rem;
+}
+
+.sankey-metric-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 0.7rem 0.8rem;
+}
+
+.sankey-metric-card.metric-blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.sankey-metric-card.metric-purple {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.sankey-metric-card.metric-green {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.sankey-metric-card h4 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.35rem;
+}
+
+.metric-value {
+  font-size: 1rem;
+  font-weight: 750;
+  color: var(--color-text);
+  line-height: 1.25;
+}
+
+.metric-sub {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.metric-like {
+  color: var(--color-blue);
+  font-weight: 800;
+}
+
+.metric-match {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.metric-date {
+  color: var(--color-success);
+  font-weight: 800;
+}
+
+.insights-card {
+  margin-top: 1.25rem;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr;
+  gap: 0.9rem;
+}
+
+.insight-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem;
+  background: #fff;
+}
+
+.insight-panel h4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.55rem;
+}
+
+.insight-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.86rem;
+}
+
+.opener-list {
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.opener-item {
+  display: block;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.55rem;
+  background: #fafbff;
+}
+
+.opener-text {
+  font-size: 0.84rem;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.conversation-explorer {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.conversation-outcome-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.conversation-filter-btn {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 0.2rem 0.62rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.conversation-filter-btn.active {
+  border-color: #c4b5fd;
+  color: #5b21b6;
+  background: #f5f3ff;
+}
+
+.conversation-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.conversation-item-btn {
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-text);
+  padding: 0.45rem 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.conversation-item-btn.active {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.conversation-viewer {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fafbff;
+  padding: 0.55rem;
+  min-height: 140px;
+}
+
+.chat-thread {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.chat-line {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+  background: #fff;
+}
+
+.chat-line.sent {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.chat-line.received {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+}
+
+.chat-meta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.18rem;
+  letter-spacing: 0.01em;
+}
+
+.chat-line p {
+  font-size: 0.84rem;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .heatmap-header {
   display: flex;
   justify-content: space-between;
@@ -462,6 +673,19 @@ main {
 @media (max-width: 900px) {
   .charts-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sankey-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-outcome-filters {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .filter-row {
