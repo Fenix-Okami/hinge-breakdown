@@ -266,10 +266,10 @@ export function renderSankey(container, stats) {
     .join('linearGradient')
     .attr('id', (_d, i) => `${gradientIdPrefix}-${i}`)
     .attr('gradientUnits', 'userSpaceOnUse')
-    .attr('x1', d => d.source.x1 + margin.left)
-    .attr('x2', d => d.target.x0 + margin.left)
-    .attr('y1', d => d.y0 + margin.top)
-    .attr('y2', d => d.y1 + margin.top);
+    .attr('x1', d => d.source.x1)
+    .attr('x2', d => d.target.x0)
+    .attr('y1', d => d.y0)
+    .attr('y2', d => d.y1);
 
   linkGradients
     .selectAll('stop')

@@ -183,13 +183,13 @@ function renderDashboard(data, isSample) {
   availableMonths = MONTHS.filter(m => monthsSet.has(m.key));
   selectedMonths = new Set(availableMonths.map(m => m.key));
 
+  uploadSection.classList.add('hidden');
+  dashboard.classList.remove('hidden');
+
   renderFilterButtons(years);
   renderFilteredDashboard();
 
   hideError();
-
-  uploadSection.classList.add('hidden');
-  dashboard.classList.remove('hidden');
 
   if (isSample) {
     sampleNotice.classList.remove('hidden');
