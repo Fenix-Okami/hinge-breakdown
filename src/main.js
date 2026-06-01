@@ -41,6 +41,12 @@ let selectedMonths = new Set();
 let heatmapMetric = 'likes';
 let selectedConversationOutcome = 'met';
 let selectedConversationIndex = 0;
+let availableMonths = [];
+
+const heatmapTooltip = document.createElement('div');
+heatmapTooltip.id = 'heatmap-tooltip';
+heatmapTooltip.className = 'heatmap-tooltip hidden';
+document.body.appendChild(heatmapTooltip);
 
 const MONTHS = [
   { key: 1, label: 'Jan' },
@@ -102,6 +108,31 @@ dropZone.addEventListener('click', e => {
   if (e.target !== uploadBtn) fileInput.click();
 });
 
+if (calendarHeatmap) {
+  calendarHeatmap.addEventListener('mouseover', e => {
+    const cell = e.target.closest('.heatmap-cell');
+    if (cell && !cell.classList.contains('heatmap-cell-outside')) {
+      const text = cell.getAttribute('data-tooltip');
+      if (text) {
+        heatmapTooltip.textContent = text;
+        heatmapTooltip.classList.remove('hidden');
+      }
+    }
+  });
+
+  calendarHeatmap.addEventListener('mousemove', e => {
+    heatmapTooltip.style.left = `${e.pageX + 10}px`;
+    heatmapTooltip.style.top = `${e.pageY - 30}px`;
+  });
+
+  calendarHeatmap.addEventListener('mouseout', e => {
+    const cell = e.target.closest('.heatmap-cell');
+    if (cell) {
+      heatmapTooltip.classList.add('hidden');
+    }
+  });
+}
+
 // ── File handling ─────────────────────────────────────────────────────────────
 
 function handleFileSelect(e) {
@@ -147,7 +178,10 @@ function renderDashboard(data, isSample) {
 
   const years = getAvailableYears(data);
   selectedYears = new Set(years);
-  selectedMonths = new Set(MONTHS.map(m => m.key));
+  
+  const monthsSet = getAvailableMonths(data);
+  availableMonths = MONTHS.filter(m => monthsSet.has(m.key));
+  selectedMonths = new Set(availableMonths.map(m => m.key));
 
   renderFilterButtons(years);
   renderFilteredDashboard();
@@ -278,7 +312,7 @@ function renderCalendarHeatmap(data, metric) {
           ? `rgba(59,130,246,${0.18 + 0.82 * (value / maxValue)})`
           : `rgba(124,58,237,${0.18 + 0.82 * (value / maxValue)})`;
       }
-      cell.title = `${key}: ${value} ${metric === 'likes' ? 'likes sent' : 'matches made'}`;
+      cell.setAttribute('data-tooltip', `${key}: ${value} ${metric === 'likes' ? 'likes sent' : 'matches made'}`);
       grid.appendChild(cell);
     }
 
@@ -301,6 +335,7 @@ function resetDashboard() {
   sourceData = null;
   selectedYears = new Set();
   selectedMonths = new Set();
+  availableMonths = [];
   const sankeyContainer = document.getElementById('sankey-chart');
   if (sankeyContainer) sankeyContainer.innerHTML = '';
   hideError();
@@ -315,6 +350,17 @@ function getAvailableYears(data) {
   }
 
   return Array.from(years).sort((a, b) => b - a);
+}
+
+function getAvailableMonths(data) {
+  const months = new Set();
+
+  for (const match of data) {
+    const date = getMatchAnchorDate(match);
+    if (date) months.add(date.getMonth() + 1);
+  }
+
+  return months;
 }
 
 function filterMatches(data, yearSet, monthSet) {
@@ -343,7 +389,7 @@ function renderFilterButtons(years) {
     }));
   }
 
-  for (const month of MONTHS) {
+  for (const month of availableMonths) {
     monthFilters.appendChild(createFilterButton(month.label, true, () => {
       if (selectedMonths.has(month.key)) {
         selectedMonths.delete(month.key);
@@ -369,8 +415,10 @@ function refreshFilterUI(years) {
 
   const monthButtons = monthFilters.querySelectorAll('button');
   monthButtons.forEach((btn, index) => {
-    const monthKey = MONTHS[index].key;
-    btn.classList.toggle('active', selectedMonths.has(monthKey));
+    const month = availableMonths[index];
+    if (month) {
+      btn.classList.toggle('active', selectedMonths.has(month.key));
+    }
   });
 }
 
